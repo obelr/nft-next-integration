@@ -27,6 +27,26 @@ const Page: React.FC = () => {
     }
   };
 
+  const uploadImage = async () => {
+    const formData = new FormData();
+    formData.append("file", image as Blob);
+
+    try {
+      const response = await axios.post("https://api.nft.storage/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${NFT_STORAGE_API_KEY}`,
+        },
+      });
+
+      return response.data.value.cid; // Return the CID of the uploaded image
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      showToast("Error uploading image. Please try again.", "error");
+      throw error; // Throw the error to stop further execution
+    }
+  };
+
   const handleConnectMetamask = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -36,45 +56,40 @@ const Page: React.FC = () => {
       return;
     }
 
-    // Step 1: Upload image and metadata to nft.storage
-    const formData = new FormData();
-    formData.append("file", image as Blob);
-    formData.append(
-      "metadata",
-      JSON.stringify({
+    try {
+      // Step 1: Upload image and get CID
+      const imageCID = await uploadImage();
+
+      // Step 2: Prepare metadata
+      const metadata = {
         name,
         description: subject,
         studentName,
         walletAddress,
-      })
-    );
+        image: `ipfs://${imageCID}/card.jpeg`, // Assuming the uploaded image has the name 'card.jpeg'
+      };
 
-    try {
-      const response = await axios.post(
+      // Step 3: Upload metadata to nft.storage
+      const metadataResponse = await axios.post(
         "https://api.nft.storage/upload",
-        formData,
+        JSON.stringify(metadata),
         {
           headers: {
-            "Content-Type": "multipart/form-data",
+            "Content-Type": "application/json",
             Authorization: `Bearer ${NFT_STORAGE_API_KEY}`,
           },
         }
       );
 
       // Log the response for debugging (you can remove this in production)
-      console.log("NFT Storage API Response:", response.data);
+      console.log("NFT Storage Metadata API Response:", metadataResponse.data);
 
       // Display success message
       showToast("Image and metadata uploaded successfully!", "success");
       // You can add route to wanted pages
     } catch (error) {
-      console.error("Error uploading image or metadata:", error);
-
-      // Display error message
-      showToast(
-        "Error uploading image or metadata. Please try again.",
-        "error"
-      );
+      console.error("Error uploading metadata:", error);
+      showToast("Error uploading metadata. Please try again.", "error");
     }
   };
   return (
